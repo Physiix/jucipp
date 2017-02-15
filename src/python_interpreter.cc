@@ -25,19 +25,11 @@ inline pybind11::module pyobject_from_gobj(gpointer ptr){
 }
 
 Python::Interpreter::Interpreter(){
-#ifdef _WIN32
-  auto root_path=Config::get().terminal.msys2_mingw_path;
-  add_path(root_path/"include/python3.5m");
-  add_path(root_path/"lib/python3.5");
-  long long unsigned size = 0L;
-#else
-  long unsigned size = 0L;
-#endif
   auto init_juci_api=[](){
     pybind11::module(pygobject_init(-1,-1,-1),false);
     pybind11::module api("jucpp","Python bindings for juCi++");
     api
-    .def("get_juci_home",[](){return Config::get().juci_home_path().string();})
+    .def("get_juci_home",[](){return Config::get().home_juci_path.string();})
     .def("get_plugin_folder",[](){return Config::get().python.plugin_directory;});
     api
     .def_submodule("editor")
@@ -55,7 +47,7 @@ Python::Interpreter::Interpreter(){
       });
     api
     .def("get_gio_plugin_menu",[](){
-      auto &plugin_menu=Menu::get().plugin_menu;
+      auto plugin_menu=Menu::get().plugin_menu;
       if(!plugin_menu){
         plugin_menu=Gio::Menu::create();
         plugin_menu->append("<empty>");
@@ -77,10 +69,13 @@ Python::Interpreter::Interpreter(){
   };
   PyImport_AppendInittab("jucipp", init_juci_api);
   Config::get().load();
-  auto plugin_path=Config::get().python.plugin_directory;
-  add_path(Config::get().python.site_packages);
-  add_path(plugin_path);
+  configure_path();
   Py_Initialize();
+  #ifdef _WIN32
+    long long unsigned size = 0L;
+  #else
+    long unsigned size = 0L;
+  #endif
   argv=DecodeLocale("",&size);
   PySys_SetArgv(0,&argv);
   auto sys=get_loaded_module("sys");
@@ -92,7 +87,7 @@ Python::Interpreter::Interpreter(){
   };
   sys.attr("excepthook")=pybind11::cpp_function(exc_func);
   boost::filesystem::directory_iterator end_it;
-  for(boost::filesystem::directory_iterator it(plugin_path);it!=end_it;it++){
+  for(boost::filesystem::directory_iterator it(Config::get().python.plugin_directory);it!=end_it;it++){
     auto module_name=it->path().stem().string();
     if(module_name.empty())
       continue;
@@ -131,17 +126,27 @@ Python::Error::Error(pybind11::object type,pybind11::object value,pybind11::obje
   trace=traceback;
 }
 
-void Python::Interpreter::add_path(const boost::filesystem::path &path){
-  if(path.empty())
-    return;
-  std::wstring sys_path(Py_GetPath());
-  if(!sys_path.empty())
-#ifdef _WIN32
-    sys_path += ';';
-#else
-    sys_path += ':';
-#endif
-  sys_path += path.generic_wstring();
+void Python::Interpreter::configure_path(){
+  const std::vector<boost::filesystem::path> python_path = {
+    "/usr/lib/python3.6",
+    "/usr/lib/python3.6/lib-dynload",
+    "/usr/lib/python3.6/site-packages",
+    Config::get().python.site_packages,
+    Config::get().python.plugin_directory
+  };
+  std::wstring sys_path;
+  for(auto &path:python_path){
+    if(path.empty())
+      continue;
+    if(!sys_path.empty()){
+    #ifdef _WIN32
+        sys_path += ';';
+    #else
+        sys_path += ':';
+    #endif
+    }
+    sys_path += path.generic_wstring();
+  }
   Py_SetPath(sys_path.c_str());
 }
 

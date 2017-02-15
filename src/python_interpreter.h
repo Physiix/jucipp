@@ -14,7 +14,7 @@ class Python {
     Interpreter();
     ~Interpreter();
     wchar_t *argv;
-    void add_path(const boost::filesystem::path &path);
+    void configure_path();
   public:
     static Interpreter& get(){
       static Interpreter singleton;
