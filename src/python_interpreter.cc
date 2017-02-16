@@ -47,13 +47,12 @@ Python::Interpreter::Interpreter(){
       });
     api
     .def("get_gio_plugin_menu",[](){
-      auto plugin_menu=Menu::get().plugin_menu;
-      if(!plugin_menu){
-        plugin_menu=Gio::Menu::create();
-        plugin_menu->append("<empty>");
-        Menu::get().window_menu->append_submenu("_Plugins",plugin_menu);
+      if(!Menu::get().plugin_menu){
+        Menu::get().plugin_menu=Gio::Menu::create();
+        Menu::get().plugin_menu->append("<empty>");
+        Menu::get().window_menu->append_submenu("_Plugins",Menu::get().plugin_menu);
       }
-      return pyobject_from_gobj(plugin_menu->gobj());
+      return pyobject_from_gobj(Menu::get().plugin_menu->gobj());
     })
     .def("get_gio_window_menu",[](){return pyobject_from_gobj(Menu::get().window_menu->gobj());})
     .def("get_gio_juci_menu",[](){return pyobject_from_gobj(Menu::get().juci_menu->gobj());})
